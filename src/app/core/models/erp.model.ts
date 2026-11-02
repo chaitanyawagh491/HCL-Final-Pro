@@ -16,6 +16,13 @@ export interface User {
   department?: string;
   avatar?: string;
   designation?: string;
+  phone?: string;
+  location?: string;
+  education?: string;
+  currentEducation?: string;
+  university?: string;
+  careerInterest?: string;
+  lastPasswordUpdate?: string;
 }
 
 export type EmploymentStatus = 'Full-time' | 'Part-time' | 'Contract' | 'Probation' | 'Terminated';
@@ -33,6 +40,7 @@ export interface Employee {
   departmentName: string;
   designation: string;
   professionalGoal?: string;
+  careerInterest?: string;
   education?: string;
   currentEducation?: string;
   university?: string;
@@ -40,6 +48,7 @@ export interface Employee {
   salary: number;
   employmentStatus: EmploymentStatus;
   address: string;
+  location?: string;
   // Leave balances
   casualLeaveBalance: number;
   sickLeaveBalance: number;

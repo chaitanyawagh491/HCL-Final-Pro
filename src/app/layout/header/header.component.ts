@@ -16,6 +16,7 @@ import { FormsModule } from '@angular/forms';
 import { IconComponent } from '../../shared/components/icon/icon.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { UserRole } from '../../core/models/erp.model';
+import { DEFAULT_AVATAR, CW_AVATAR } from '../../core/constants/avatars';
 
 @Component({
   selector: 'app-header',
@@ -427,13 +428,12 @@ export class HeaderComponent {
   showProfileMenu = false;
   showResetModal = false;
   isDark = signal(false);
-  defaultAvatar = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" fill="none"><rect width="36" height="36" fill="%23EFF6FF"/><circle cx="18" cy="14" r="7" fill="%232563EB"/><path d="M7 30C7 24.1421 11.7421 19.4 17.6 19.4C23.4579 19.4 28.2 24.1421 28.2 30" stroke="%232563EB" stroke-width="2.5" stroke-linecap="round"/></svg>';
+  defaultAvatar = DEFAULT_AVATAR;
 
   onAvatarError(event: Event): void {
     const target = event.target as HTMLImageElement;
-    if (target.src !== this.defaultAvatar) {
-      target.src = this.defaultAvatar;
-    }
+    target.onerror = null;
+    target.src = this.defaultAvatar;
   }
 
   toggleTheme(): void {
@@ -486,12 +486,7 @@ export class HeaderComponent {
 
   goToProfile(): void {
     this.showProfileMenu = false;
-    const user = this.auth.currentUser();
-    if (user?.employeeId) {
-      this.router.navigate(['/hr/employees', user.employeeId]);
-    } else {
-      this.router.navigate(['/hr/employees']);
-    }
+    this.router.navigate(['/profile']);
   }
 
   logout(): void {

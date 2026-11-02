@@ -54,12 +54,16 @@ export class AuthService {
     const demoUsers = this.demoData.getDemoUsers();
     let hasChanges = false;
 
-    // Merge & ensure all demo users are present with up-to-date roles, designations and passwords
+    // Merge & ensure all demo users are present with up-to-date roles, designations and credentials
     demoUsers.forEach(demo => {
       const idx = users.findIndex(u => u.employeeId === demo.employeeId || u.role === demo.role);
       if (idx !== -1) {
-        if (!users[idx].password || !users[idx].designation || users[idx].name !== demo.name) {
-          users[idx] = { ...users[idx], ...demo };
+        if (!users[idx].password || !users[idx].designation || !users[idx].avatar || users[idx].avatar.includes('unsplash')) {
+          users[idx] = { ...users[idx], ...demo, password: users[idx].password || demo.password };
+          hasChanges = true;
+        }
+        if (demo.employeeId === 'EMP-1001' && (!users[idx].location || !users[idx].careerInterest)) {
+          users[idx] = { ...users[idx], ...demo, password: users[idx].password || demo.password };
           hasChanges = true;
         }
       } else {
@@ -72,6 +76,43 @@ export class AuthService {
       this.storage.setItem(this.USERS_KEY, users);
     }
     return users;
+  }
+
+  updateCurrentUser(updates: Partial<User>): User {
+    const current = this.currentUser();
+    const updatedUser: User = {
+      ...(current || {} as User),
+      ...updates
+    };
+    this.currentUser.set(updatedUser);
+    this.storage.setItem(this.CURRENT_USER_KEY, updatedUser);
+
+    const users = this.getUsers();
+    const idx = users.findIndex(u => u.id === updatedUser.id || (updatedUser.employeeId && u.employeeId === updatedUser.employeeId));
+    if (idx !== -1) {
+      users[idx] = { ...users[idx], ...updates };
+      this.storage.setItem(this.USERS_KEY, users);
+    }
+    return updatedUser;
+  }
+
+  changePassword(oldPassword: string, newPassword: string): { success: boolean; message: string } {
+    const current = this.currentUser();
+    if (!current) {
+      return { success: false, message: 'No user session active.' };
+    }
+    if (current.password && oldPassword.trim() !== current.password.trim()) {
+      return { success: false, message: 'Current password does not match your active account password.' };
+    }
+    if (!newPassword || newPassword.trim().length < 4) {
+      return { success: false, message: 'New password must be at least 4 characters in length.' };
+    }
+    const lastUpdate = new Date().toISOString().split('T')[0];
+    this.updateCurrentUser({
+      password: newPassword.trim(),
+      lastPasswordUpdate: lastUpdate
+    });
+    return { success: true, message: 'Password has been successfully changed and saved.' };
   }
 
   login(email: string, password?: string, rememberMe = true): { success: boolean; message?: string } {

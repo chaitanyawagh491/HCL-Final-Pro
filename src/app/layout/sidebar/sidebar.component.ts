@@ -1,9 +1,10 @@
 import { Component, Input, Output, EventEmitter, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { IconComponent } from '../../shared/components/icon/icon.component';
 import { BadgeComponent } from '../../shared/components/badge/badge.component';
+import { DEFAULT_AVATAR, CW_AVATAR } from '../../core/constants/avatars';
 
 interface NavItem {
   label: string;
@@ -65,7 +66,7 @@ interface NavSection {
 
       <!-- User Role Pill at Bottom -->
       <div class="sidebar-footer" *ngIf="!isCollapsed">
-        <div class="user-role-card">
+        <div class="user-role-card" (click)="router.navigate(['/profile'])" style="cursor: pointer;" title="View My Profile">
           <div class="role-avatar">
             <img
               [src]="auth.currentUser()?.avatar || defaultAvatar"
@@ -239,16 +240,16 @@ interface NavSection {
 })
 export class SidebarComponent {
   auth = inject(AuthService);
+  router = inject(Router);
 
   @Input() isCollapsed = false;
 
-  defaultAvatar = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" fill="none"><rect width="36" height="36" fill="%23EFF6FF"/><circle cx="18" cy="14" r="7" fill="%232563EB"/><path d="M7 30C7 24.1421 11.7421 19.4 17.6 19.4C23.4579 19.4 28.2 24.1421 28.2 30" stroke="%232563EB" stroke-width="2.5" stroke-linecap="round"/></svg>';
+  defaultAvatar = DEFAULT_AVATAR;
 
   onAvatarError(event: Event): void {
     const target = event.target as HTMLImageElement;
-    if (target.src !== this.defaultAvatar) {
-      target.src = this.defaultAvatar;
-    }
+    target.onerror = null;
+    target.src = this.defaultAvatar;
   }
 
   navSections: NavSection[] = [

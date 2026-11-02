@@ -10,6 +10,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
 import { BadgeComponent } from '../../../shared/components/badge/badge.component';
 import { ModalComponent } from '../../../shared/components/modal/modal.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
+import { DEFAULT_AVATAR } from '../../../core/constants/avatars';
 import { PaginationComponent } from '../../../shared/components/pagination/pagination.component';
 import { EmptyStateComponent } from '../../../shared/components/empty-state/empty-state.component';
 
@@ -386,7 +387,7 @@ export class EmployeeListComponent implements OnInit {
     });
   }
 
-  defaultAvatar = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" fill="none"><rect width="40" height="40" fill="%23EFF6FF"/><circle cx="20" cy="16" r="8" fill="%232563EB"/><path d="M8 34C8 27.3726 13.3726 22 20 22C26.6274 22 32 27.3726 32 34" stroke="%232563EB" stroke-width="2.5" stroke-linecap="round"/></svg>';
+  defaultAvatar = DEFAULT_AVATAR;
 
   searchQuery = '';
   selectedDept = 'All';
@@ -607,9 +608,8 @@ export class EmployeeListComponent implements OnInit {
 
   onAvatarError(event: Event): void {
     const target = event.target as HTMLImageElement;
-    if (target.src !== this.defaultAvatar) {
-      target.src = this.defaultAvatar;
-    }
+    target.onerror = null;
+    target.src = this.defaultAvatar;
   }
 }
 

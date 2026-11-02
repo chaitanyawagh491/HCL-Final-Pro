@@ -6,6 +6,7 @@ import { LeaveService } from '../../../core/services/leave.service';
 import { Employee, LeaveRequest } from '../../../core/models/erp.model';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
 import { BadgeComponent } from '../../../shared/components/badge/badge.component';
+import { DEFAULT_AVATAR } from '../../../core/constants/avatars';
 
 @Component({
   selector: 'app-employee-detail',
@@ -544,7 +545,7 @@ export class EmployeeDetailComponent implements OnInit {
 
   employee?: Employee;
   employeeLeaves: LeaveRequest[] = [];
-  defaultAvatar = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="104" height="104" viewBox="0 0 104 104" fill="none"><rect width="104" height="104" fill="%23EFF6FF"/><circle cx="52" cy="42" r="20" fill="%232563EB"/><path d="M22 88C22 71.4315 35.4315 58 52 58C68.5685 58 82 71.4315 82 88" stroke="%232563EB" stroke-width="6" stroke-linecap="round"/></svg>';
+  defaultAvatar = DEFAULT_AVATAR;
 
   ngOnInit(): void {
     this.route.paramMap.subscribe(params => {
@@ -560,8 +561,7 @@ export class EmployeeDetailComponent implements OnInit {
 
   onAvatarError(event: Event): void {
     const target = event.target as HTMLImageElement;
-    if (target.src !== this.defaultAvatar) {
-      target.src = this.defaultAvatar;
-    }
+    target.onerror = null;
+    target.src = this.defaultAvatar;
   }
 }

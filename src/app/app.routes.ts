@@ -19,6 +19,7 @@ import { ExpenseListComponent } from './features/finance/expenses/expense-list.c
 import { ReportsComponent } from './features/finance/reports/reports.component';
 import { WorkflowOverviewComponent } from './features/finance/workflows/workflow-overview.component';
 import { SystemSettingsComponent } from './features/system/settings/system-settings.component';
+import { ProfileComponent } from './features/profile/profile.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -29,6 +30,7 @@ export const routes: Routes = [
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: 'dashboard', component: DashboardComponent },
+      { path: 'profile', component: ProfileComponent },
 
       // Module 1: Employee, HR and Leave Management
       { path: 'hr', redirectTo: 'hr/employees', pathMatch: 'full' },

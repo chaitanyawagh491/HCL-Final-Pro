@@ -26,21 +26,53 @@ export class EmployeeService {
 
   private loadEmployees(): void {
     let data = this.storage.getItem<Employee[]>(this.KEY, this.demoData.getDemoEmployees());
-    const demoEmp1001 = this.demoData.getDemoEmployees().find(e => e.employeeId === 'EMP-1001');
+    const demoEmployees = this.demoData.getDemoEmployees();
+    let hasChanges = false;
+
+    // Remove any legacy unsplash URLs and ensure all employees have offline vector avatars
+    data = data.map(emp => {
+      if (!emp.avatar || emp.avatar.includes('unsplash') || emp.avatar.startsWith('/assets')) {
+        const demo = demoEmployees.find(d => d.employeeId === emp.employeeId);
+        if (demo) {
+          hasChanges = true;
+          return { ...emp, avatar: demo.avatar };
+        }
+      }
+      return emp;
+    });
+
+    const demoEmp1001 = demoEmployees.find(e => e.employeeId === 'EMP-1001');
     if (demoEmp1001) {
       const idx = data.findIndex(e => e.employeeId === 'EMP-1001');
       if (idx !== -1) {
-        if (data[idx].fullName !== demoEmp1001.fullName || !data[idx].professionalGoal || data[idx].avatar.startsWith('/assets')) {
-          data[idx] = { ...data[idx], ...demoEmp1001 };
-          this.storage.setItem(this.KEY, data);
+        if (!data[idx].location || !data[idx].careerInterest || data[idx].avatar.includes('unsplash') || data[idx].avatar.startsWith('/assets')) {
+          data[idx] = {
+            ...data[idx],
+            avatar: demoEmp1001.avatar,
+            location: data[idx].location || demoEmp1001.location,
+            careerInterest: data[idx].careerInterest || demoEmp1001.careerInterest,
+            professionalGoal: data[idx].professionalGoal || demoEmp1001.professionalGoal,
+            education: data[idx].education || demoEmp1001.education,
+            currentEducation: data[idx].currentEducation || demoEmp1001.currentEducation,
+            university: data[idx].university || demoEmp1001.university
+          };
+          hasChanges = true;
         }
       } else {
         data.unshift(demoEmp1001);
-        this.storage.setItem(this.KEY, data);
+        hasChanges = true;
       }
+    }
+
+    if (hasChanges) {
+      this.storage.setItem(this.KEY, data);
     }
     this.employees.set(data);
     this.syncDepartmentCounts(data);
+  }
+
+  updateProfile(employeeId: string, updates: Partial<Employee>): Employee | null {
+    return this.updateEmployee(employeeId, updates);
   }
 
   private save(data: Employee[]): void {
