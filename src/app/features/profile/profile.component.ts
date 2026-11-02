@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, computed, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
@@ -13,6 +13,7 @@ import { CW_AVATAR, DEFAULT_AVATAR } from '../../core/constants/avatars';
 @Component({
   selector: 'app-profile',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterModule, IconComponent, BadgeComponent],
   template: `
     <div class="profile-container">
@@ -138,7 +139,7 @@ import { CW_AVATAR, DEFAULT_AVATAR } from '../../core/constants/avatars';
           <div class="stat-box-divider"></div>
           <div class="stat-box">
             <span class="stat-box-label">Accrued Leaves</span>
-            <span class="stat-box-val text-primary">{{ totalLeaveBalance }} Days</span>
+            <span class="stat-box-val text-primary">{{ totalLeaveBalance() }} Days</span>
             <span class="stat-box-sub">Casual: {{ currentEmployee()?.casualLeaveBalance || 12 }} | Sick: {{ currentEmployee()?.sickLeaveBalance || 10 }} | Earned: {{ currentEmployee()?.earnedLeaveBalance || 15 }}</span>
           </div>
         </div>
@@ -1282,11 +1283,11 @@ export class ProfileComponent implements OnInit {
     });
   }
 
-  get totalLeaveBalance(): number {
+  totalLeaveBalance = computed(() => {
     const emp = this.currentEmployee();
     if (!emp) return 37;
     return (emp.casualLeaveBalance || 0) + (emp.sickLeaveBalance || 0) + (emp.earnedLeaveBalance || 0);
-  }
+  });
 
   startEditing(): void {
     this.isEditing.set(true);
@@ -1405,3 +1406,4 @@ export class ProfileComponent implements OnInit {
     target.src = this.defaultAvatar;
   }
 }
+

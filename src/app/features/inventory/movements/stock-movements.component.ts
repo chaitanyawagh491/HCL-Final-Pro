@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { InventoryService } from '../../../core/services/inventory.service';
@@ -9,6 +9,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
 @Component({
   selector: 'app-stock-movements',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, RouterModule, IconComponent, EmptyStateComponent],
   template: `
     <div class="movements-page">
@@ -41,7 +42,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let m of inventoryService.stockMovements()">
+              <tr *ngFor="let m of inventoryService.stockMovements(); trackBy: trackById">
                 <td><strong class="font-mono">{{ m.movementId }}</strong></td>
                 <td>
                   <strong>{{ m.productName }}</strong>
@@ -119,6 +120,10 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
 })
 export class StockMovementsComponent {
   inventoryService = inject(InventoryService);
+
+  trackById(index: number, m: StockMovement): string {
+    return m.id || m.movementId || index.toString();
+  }
 
   formatRefType(ref: string): string {
     return ref.replace(/_/g, ' ');

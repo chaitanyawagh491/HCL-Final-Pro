@@ -2,69 +2,60 @@ import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
 import { MainLayoutComponent } from './layout/main-layout/main-layout.component';
-import { LoginComponent } from './features/auth/login/login.component';
-import { DashboardComponent } from './features/dashboard/dashboard.component';
-import { EmployeeListComponent } from './features/hr/employees/employee-list.component';
-import { EmployeeDetailComponent } from './features/hr/employees/employee-detail.component';
-import { DepartmentListComponent } from './features/hr/departments/department-list.component';
-import { LeaveManagementComponent } from './features/hr/leave/leave-management.component';
-import { ProductListComponent } from './features/inventory/products/product-list.component';
-import { SupplierListComponent } from './features/inventory/suppliers/supplier-list.component';
-import { ProcurementComponent } from './features/inventory/procurement/procurement.component';
-import { StockMovementsComponent } from './features/inventory/movements/stock-movements.component';
-import { SalesOrdersComponent } from './features/sales/orders/sales-orders.component';
-import { InvoiceListComponent } from './features/sales/invoices/invoice-list.component';
-import { FinanceDashboardComponent } from './features/finance/dashboard/finance-dashboard.component';
-import { ExpenseListComponent } from './features/finance/expenses/expense-list.component';
-import { ReportsComponent } from './features/finance/reports/reports.component';
-import { WorkflowOverviewComponent } from './features/finance/workflows/workflow-overview.component';
-import { SystemSettingsComponent } from './features/system/settings/system-settings.component';
-import { ProfileComponent } from './features/profile/profile.component';
 
 export const routes: Routes = [
-  { path: 'login', component: LoginComponent },
+  {
+    path: 'login',
+    loadComponent: () => import('./features/auth/login/login.component').then(m => m.LoginComponent)
+  },
   {
     path: '',
     component: MainLayoutComponent,
     canActivate: [authGuard],
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
-      { path: 'dashboard', component: DashboardComponent },
-      { path: 'profile', component: ProfileComponent },
+      {
+        path: 'dashboard',
+        loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent)
+      },
+      {
+        path: 'profile',
+        loadComponent: () => import('./features/profile/profile.component').then(m => m.ProfileComponent)
+      },
 
       // Module 1: Employee, HR and Leave Management
       { path: 'hr', redirectTo: 'hr/employees', pathMatch: 'full' },
       {
         path: 'hr/employees',
-        component: EmployeeListComponent,
+        loadComponent: () => import('./features/hr/employees/employee-list.component').then(m => m.EmployeeListComponent),
         canActivate: [roleGuard],
         data: { roles: ['Admin', 'HR Manager'] }
       },
       {
         path: 'hr/employees/:id',
-        component: EmployeeDetailComponent
+        loadComponent: () => import('./features/hr/employees/employee-detail.component').then(m => m.EmployeeDetailComponent)
       },
       {
         path: 'hr/departments',
-        component: DepartmentListComponent,
+        loadComponent: () => import('./features/hr/departments/department-list.component').then(m => m.DepartmentListComponent),
         canActivate: [roleGuard],
         data: { roles: ['Admin', 'HR Manager'] }
       },
       {
         path: 'hr/leave',
-        component: LeaveManagementComponent,
+        loadComponent: () => import('./features/hr/leave/leave-management.component').then(m => m.LeaveManagementComponent),
         canActivate: [roleGuard],
         data: { roles: ['Admin', 'HR Manager', 'Employee'] }
       },
       {
         path: 'hr/leaves',
-        component: LeaveManagementComponent,
+        loadComponent: () => import('./features/hr/leave/leave-management.component').then(m => m.LeaveManagementComponent),
         canActivate: [roleGuard],
         data: { roles: ['Admin', 'HR Manager', 'Employee'] }
       },
       {
         path: 'hr/reports',
-        component: ReportsComponent,
+        loadComponent: () => import('./features/finance/reports/reports.component').then(m => m.ReportsComponent),
         canActivate: [roleGuard],
         data: { roles: ['Admin', 'HR Manager', 'Finance Manager'] }
       },
@@ -73,25 +64,25 @@ export const routes: Routes = [
       { path: 'inventory', redirectTo: 'inventory/products', pathMatch: 'full' },
       {
         path: 'inventory/products',
-        component: ProductListComponent,
+        loadComponent: () => import('./features/inventory/products/product-list.component').then(m => m.ProductListComponent),
         canActivate: [roleGuard],
         data: { roles: ['Admin', 'Inventory Manager'] }
       },
       {
         path: 'inventory/suppliers',
-        component: SupplierListComponent,
+        loadComponent: () => import('./features/inventory/suppliers/supplier-list.component').then(m => m.SupplierListComponent),
         canActivate: [roleGuard],
         data: { roles: ['Admin', 'Inventory Manager'] }
       },
       {
         path: 'inventory/procurement',
-        component: ProcurementComponent,
+        loadComponent: () => import('./features/inventory/procurement/procurement.component').then(m => m.ProcurementComponent),
         canActivate: [roleGuard],
         data: { roles: ['Admin', 'Inventory Manager'] }
       },
       {
         path: 'inventory/movements',
-        component: StockMovementsComponent,
+        loadComponent: () => import('./features/inventory/movements/stock-movements.component').then(m => m.StockMovementsComponent),
         canActivate: [roleGuard],
         data: { roles: ['Admin', 'Inventory Manager'] }
       },
@@ -101,13 +92,13 @@ export const routes: Routes = [
       { path: 'sales/customers', redirectTo: 'sales/orders', pathMatch: 'full' },
       {
         path: 'sales/orders',
-        component: SalesOrdersComponent,
+        loadComponent: () => import('./features/sales/orders/sales-orders.component').then(m => m.SalesOrdersComponent),
         canActivate: [roleGuard],
         data: { roles: ['Admin', 'Sales Manager'] }
       },
       {
         path: 'sales/invoices',
-        component: InvoiceListComponent,
+        loadComponent: () => import('./features/sales/invoices/invoice-list.component').then(m => m.InvoiceListComponent),
         canActivate: [roleGuard],
         data: { roles: ['Admin', 'Sales Manager', 'Finance Manager'] }
       },
@@ -116,47 +107,47 @@ export const routes: Routes = [
       { path: 'finance', redirectTo: 'finance/dashboard', pathMatch: 'full' },
       {
         path: 'finance/dashboard',
-        component: FinanceDashboardComponent,
+        loadComponent: () => import('./features/finance/dashboard/finance-dashboard.component').then(m => m.FinanceDashboardComponent),
         canActivate: [roleGuard],
         data: { roles: ['Admin', 'Finance Manager'] }
       },
       {
         path: 'finance/expenses',
-        component: ExpenseListComponent,
+        loadComponent: () => import('./features/finance/expenses/expense-list.component').then(m => m.ExpenseListComponent),
         canActivate: [roleGuard],
         data: { roles: ['Admin', 'Finance Manager'] }
       },
       {
         path: 'finance/reports',
-        component: ReportsComponent,
+        loadComponent: () => import('./features/finance/reports/reports.component').then(m => m.ReportsComponent),
         canActivate: [roleGuard],
         data: { roles: ['Admin', 'Finance Manager', 'HR Manager'] }
       },
       {
         path: 'finance/workflows',
-        component: WorkflowOverviewComponent
+        loadComponent: () => import('./features/finance/workflows/workflow-overview.component').then(m => m.WorkflowOverviewComponent)
       },
       {
         path: 'workflows',
-        component: WorkflowOverviewComponent
+        loadComponent: () => import('./features/finance/workflows/workflow-overview.component').then(m => m.WorkflowOverviewComponent)
       },
 
       // System Management
       {
         path: 'system/settings',
-        component: SystemSettingsComponent,
+        loadComponent: () => import('./features/system/settings/system-settings.component').then(m => m.SystemSettingsComponent),
         canActivate: [roleGuard],
         data: { roles: ['Admin'] }
       },
       {
         path: 'system/users',
-        component: SystemSettingsComponent,
+        loadComponent: () => import('./features/system/settings/system-settings.component').then(m => m.SystemSettingsComponent),
         canActivate: [roleGuard],
         data: { roles: ['Admin'] }
       },
       {
         path: 'settings',
-        component: SystemSettingsComponent,
+        loadComponent: () => import('./features/system/settings/system-settings.component').then(m => m.SystemSettingsComponent),
         canActivate: [roleGuard],
         data: { roles: ['Admin'] }
       }

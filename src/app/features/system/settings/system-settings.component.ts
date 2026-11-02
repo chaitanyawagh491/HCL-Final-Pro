@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -23,6 +23,7 @@ import { User, UserRole } from '../../../core/models/erp.model';
   selector: 'app-system-settings',
   standalone: true,
   imports: [CommonModule, RouterModule, FormsModule, IconComponent, ConfirmDialogComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="settings-page">
       <!-- Page Header -->
@@ -358,14 +359,13 @@ export class SystemSettingsComponent {
 
   showResetModal = false;
   defaultAvatar = DEFAULT_AVATAR;
+  approximateStorageSize = 45;
 
-  onAvatarError(event: Event): void {
-    const target = event.target as HTMLImageElement;
-    target.onerror = null;
-    target.src = this.defaultAvatar;
+  ngOnInit(): void {
+    this.calculateStorage();
   }
 
-  get approximateStorageSize(): number {
+  calculateStorage(): void {
     try {
       let total = 0;
       for (const x in localStorage) {
@@ -373,10 +373,20 @@ export class SystemSettingsComponent {
           total += (localStorage[x].length * 2);
         }
       }
-      return Math.round(total / 1024);
+      this.approximateStorageSize = Math.round(total / 1024);
     } catch {
-      return 45;
+      this.approximateStorageSize = 45;
     }
+  }
+
+  onAvatarError(event: Event): void {
+    const target = event.target as HTMLImageElement;
+    target.onerror = null;
+    target.src = this.defaultAvatar;
+  }
+
+  trackById(index: number, item: any): string {
+    return item.id || index;
   }
 
   switchToRole(role: UserRole): void {

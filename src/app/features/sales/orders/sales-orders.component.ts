@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -16,6 +16,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
 @Component({
   selector: 'app-sales-orders',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
     RouterModule,
@@ -70,7 +71,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
         </div>
         <div class="sales-kpi-card">
           <span class="kpi-lbl">In-Flight Orders</span>
-          <span class="kpi-val text-warning">{{ inFlightOrdersCount }} Orders</span>
+          <span class="kpi-val text-warning">{{ inFlightOrdersCount() }} Orders</span>
           <span class="kpi-sub">Confirmed / Processing / Shipped</span>
         </div>
       </div>
@@ -83,7 +84,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
             type="text"
             class="form-control"
             placeholder="Search by order #, customer, email..."
-            [value]="searchQuery"
+            [value]="searchQuery()"
             (input)="onSearch($event)"
           />
         </div>
@@ -126,7 +127,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let order of pagedOrders">
+              <tr *ngFor="let order of pagedOrders(); trackBy: trackById">
                 <td><strong class="font-mono">{{ order.orderNumber }}</strong></td>
                 <td>
                   <strong>{{ order.customerName }}</strong>
@@ -182,7 +183,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
         </div>
 
         <app-empty-state
-          *ngIf="filteredOrders.length === 0"
+          *ngIf="filteredOrders().length === 0"
           icon="shopping-cart"
           title="No sales orders found"
           description="There are no sales orders matching your search or filters."
@@ -191,10 +192,10 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
         ></app-empty-state>
 
         <app-pagination
-          [totalItems]="filteredOrders.length"
+          [totalItems]="filteredOrders().length"
           [pageSize]="pageSize"
-          [currentPage]="currentPage"
-          (pageChanged)="currentPage = $event"
+          [currentPage]="currentPage()"
+          (pageChanged)="currentPage.set($event)"
         ></app-pagination>
       </div>
 
@@ -359,7 +360,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let item of selectedOrder.items">
+                <tr *ngFor="let item of selectedOrder.items; trackBy: trackById">
                   <td><strong>{{ item.productName }}</strong></td>
                   <td><span class="sku-tag">{{ item.sku }}</span></td>
                   <td>{{ item.quantity }}</td>
@@ -551,11 +552,11 @@ export class SalesOrdersComponent {
 
   Math = Math;
 
-  searchQuery = '';
-  selectedStatus = 'All';
-  selectedPayment = 'All';
+  searchQuery = signal('');
+  selectedStatus = signal('All');
+  selectedPayment = signal('All');
 
-  currentPage = 1;
+  currentPage = signal(1);
   pageSize = 8;
 
   showCreateModal = false;
@@ -576,14 +577,48 @@ export class SalesOrdersComponent {
     return this.auth.hasRole(['Admin', 'Sales Manager']);
   }
 
-  get inFlightOrdersCount(): number {
+  inFlightOrdersCount = computed(() => {
     return this.salesService.salesOrders().filter(
       o => o.salesStatus === 'Confirmed' || o.salesStatus === 'Processing' || o.salesStatus === 'Shipped'
     ).length;
-  }
+  });
 
   get itemsFormArray(): FormArray {
     return this.salesForm.get('items') as FormArray;
+  }
+
+  filteredOrders = computed(() => {
+    let list = this.salesService.salesOrders();
+    const query = this.searchQuery().trim().toLowerCase();
+    const status = this.selectedStatus();
+    const payment = this.selectedPayment();
+
+    if (query) {
+      list = list.filter(o =>
+        o.orderNumber.toLowerCase().includes(query) ||
+        o.customerName.toLowerCase().includes(query) ||
+        o.customerEmail.toLowerCase().includes(query)
+      );
+    }
+
+    if (status !== 'All') {
+      list = list.filter(o => o.salesStatus === status);
+    }
+
+    if (payment !== 'All') {
+      list = list.filter(o => o.paymentStatus === payment);
+    }
+
+    return list;
+  });
+
+  pagedOrders = computed(() => {
+    const start = (this.currentPage() - 1) * this.pageSize;
+    return this.filteredOrders().slice(start, start + this.pageSize);
+  });
+
+  trackById(index: number, item: any): string {
+    return item?.id || item?.productId || item?.orderNumber || index.toString();
   }
 
   constructor() {
@@ -600,47 +635,19 @@ export class SalesOrdersComponent {
     });
   }
 
-  get filteredOrders(): SalesOrder[] {
-    let list = this.salesService.salesOrders();
-
-    if (this.searchQuery.trim()) {
-      const q = this.searchQuery.toLowerCase().trim();
-      list = list.filter(o =>
-        o.orderNumber.toLowerCase().includes(q) ||
-        o.customerName.toLowerCase().includes(q) ||
-        o.customerEmail.toLowerCase().includes(q)
-      );
-    }
-
-    if (this.selectedStatus !== 'All') {
-      list = list.filter(o => o.salesStatus === this.selectedStatus);
-    }
-
-    if (this.selectedPayment !== 'All') {
-      list = list.filter(o => o.paymentStatus === this.selectedPayment);
-    }
-
-    return list;
-  }
-
-  get pagedOrders(): SalesOrder[] {
-    const start = (this.currentPage - 1) * this.pageSize;
-    return this.filteredOrders.slice(start, start + this.pageSize);
-  }
-
   onSearch(event: Event): void {
-    this.searchQuery = (event.target as HTMLInputElement).value;
-    this.currentPage = 1;
+    this.searchQuery.set((event.target as HTMLInputElement).value);
+    this.currentPage.set(1);
   }
 
   onStatusFilter(event: Event): void {
-    this.selectedStatus = (event.target as HTMLSelectElement).value;
-    this.currentPage = 1;
+    this.selectedStatus.set((event.target as HTMLSelectElement).value);
+    this.currentPage.set(1);
   }
 
   onPaymentFilter(event: Event): void {
-    this.selectedPayment = (event.target as HTMLSelectElement).value;
-    this.currentPage = 1;
+    this.selectedPayment.set((event.target as HTMLSelectElement).value);
+    this.currentPage.set(1);
   }
 
   openCreateModal(): void {

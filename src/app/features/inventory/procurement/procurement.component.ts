@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormArray, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ProcurementService } from '../../../core/services/procurement.service';
@@ -15,6 +15,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
   selector: 'app-procurement',
   standalone: true,
   imports: [CommonModule, FormsModule, ReactiveFormsModule, IconComponent, BadgeComponent, ModalComponent, EmptyStateComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="procurement-page">
       <!-- Page Header -->
@@ -47,7 +48,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
             type="text"
             class="form-control"
             placeholder="Search POs by number, supplier..."
-            [value]="searchQuery"
+            [value]="searchQuery()"
             (input)="onSearch($event)"
           />
         </div>
@@ -83,7 +84,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let po of filteredPOs">
+              <tr *ngFor="let po of filteredPOs(); trackBy: trackById">
                 <td><strong class="font-mono">{{ po.poNumber }}</strong></td>
                 <td>{{ po.supplierName }}</td>
                 <td>{{ po.orderDate }}</td>
@@ -124,7 +125,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
         </div>
 
         <app-empty-state
-          *ngIf="filteredPOs.length === 0"
+          *ngIf="filteredPOs().length === 0"
           icon="shopping-cart"
           title="No purchase orders found"
           description="There are no procurement purchase orders matching your search or filter."
@@ -457,8 +458,8 @@ export class ProcurementComponent {
   auth = inject(AuthService);
   private fb = inject(FormBuilder);
 
-  searchQuery = '';
-  selectedStatus = 'All';
+  searchQuery = signal('');
+  selectedStatus = signal('All');
 
   showCreateModal = false;
   showDetailsModal = false;
@@ -496,29 +497,34 @@ export class ProcurementComponent {
     });
   }
 
-  get filteredPOs(): PurchaseOrder[] {
+  filteredPOs = computed(() => {
     let list = this.procurementService.purchaseOrders();
+    const q = this.searchQuery().toLowerCase().trim();
+    const status = this.selectedStatus();
 
-    if (this.searchQuery.trim()) {
-      const q = this.searchQuery.toLowerCase().trim();
+    if (q) {
       list = list.filter(p =>
         p.poNumber.toLowerCase().includes(q) ||
         p.supplierName.toLowerCase().includes(q)
       );
     }
 
-    if (this.selectedStatus !== 'All') {
-      list = list.filter(p => p.status === this.selectedStatus);
+    if (status !== 'All') {
+      list = list.filter(p => p.status === status);
     }
     return list;
+  });
+
+  trackById(index: number, po: PurchaseOrder): string {
+    return po.id || po.poNumber;
   }
 
   onSearch(event: Event): void {
-    this.searchQuery = (event.target as HTMLInputElement).value;
+    this.searchQuery.set((event.target as HTMLInputElement).value);
   }
 
   onStatusFilter(event: Event): void {
-    this.selectedStatus = (event.target as HTMLSelectElement).value;
+    this.selectedStatus.set((event.target as HTMLSelectElement).value);
   }
 
   openCreateModal(): void {

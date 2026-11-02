@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IconComponent } from '../icon/icon.component';
 
@@ -6,6 +6,7 @@ import { IconComponent } from '../icon/icon.component';
   selector: 'app-stat-card',
   standalone: true,
   imports: [CommonModule, IconComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="stat-card" [ngClass]="'variant-' + variant">
       <div class="stat-header">

@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DepartmentService } from '../../../core/services/department.service';
@@ -12,6 +12,7 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
 @Component({
   selector: 'app-department-list',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, ReactiveFormsModule, IconComponent, ModalComponent, ConfirmDialogComponent],
   template: `
     <div class="dept-page">
@@ -34,7 +35,7 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
 
       <!-- Department Cards Grid -->
       <div class="grid-cols-3">
-        <div class="erp-card dept-card" *ngFor="let dept of deptService.departments()">
+        <div class="erp-card dept-card" *ngFor="let dept of deptService.departments(); trackBy: trackById">
           <div class="dept-card-top">
             <div class="dept-badge">{{ dept.departmentId }}</div>
             <div class="dept-actions" *ngIf="canManage">
@@ -87,7 +88,7 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
           <div class="form-group">
             <label class="form-label required">Department Head / Manager</label>
             <select formControlName="headEmployeeName" class="form-select">
-              <option *ngFor="let emp of employeeService.employees()" [value]="emp.fullName">
+              <option *ngFor="let emp of employeeService.employees(); trackBy: trackById" [value]="emp.fullName">
                 {{ emp.fullName }} ({{ emp.designation }})
               </option>
             </select>
@@ -128,7 +129,7 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let emp of selectedDeptEmployees">
+              <tr *ngFor="let emp of selectedDeptEmployees; trackBy: trackById">
                 <td>
                   <strong>{{ emp.fullName }}</strong> ({{ emp.employeeId }})
                 </td>
@@ -283,6 +284,10 @@ export class DepartmentListComponent {
 
   get canManage(): boolean {
     return this.auth.hasRole(['Admin', 'HR Manager']);
+  }
+
+  trackById(index: number, item: any): string {
+    return item?.id || item?.departmentId || item?.employeeId || index.toString();
   }
 
   constructor() {

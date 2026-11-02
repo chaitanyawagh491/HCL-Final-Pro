@@ -1,6 +1,7 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { EmployeeService } from '../../../core/services/employee.service';
 import { LeaveService } from '../../../core/services/leave.service';
 import { Employee, LeaveRequest } from '../../../core/models/erp.model';
@@ -11,6 +12,7 @@ import { DEFAULT_AVATAR } from '../../../core/constants/avatars';
 @Component({
   selector: 'app-employee-detail',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, RouterModule, IconComponent, BadgeComponent],
   template: `
     <div class="emp-detail-page" *ngIf="employee; else notFound">
@@ -238,7 +240,7 @@ import { DEFAULT_AVATAR } from '../../../core/constants/avatars';
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let leave of employeeLeaves">
+              <tr *ngFor="let leave of employeeLeaves; trackBy: trackById">
                 <td><strong>{{ leave.requestId }}</strong></td>
                 <td>{{ leave.leaveType }}</td>
                 <td>{{ leave.startDate }}</td>
@@ -538,25 +540,36 @@ import { DEFAULT_AVATAR } from '../../../core/constants/avatars';
     }
   `]
 })
-export class EmployeeDetailComponent implements OnInit {
+export class EmployeeDetailComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private employeeService = inject(EmployeeService);
   private leaveService = inject(LeaveService);
+  private cdr = inject(ChangeDetectorRef);
+  private routeSub?: Subscription;
 
   employee?: Employee;
   employeeLeaves: LeaveRequest[] = [];
   defaultAvatar = DEFAULT_AVATAR;
 
+  trackById(index: number, leave: any): string {
+    return leave?.id || leave?.requestId || index.toString();
+  }
+
   ngOnInit(): void {
-    this.route.paramMap.subscribe(params => {
+    this.routeSub = this.route.paramMap.subscribe(params => {
       const id = params.get('id');
       if (id) {
         this.employee = this.employeeService.getEmployeeById(id);
         if (this.employee) {
           this.employeeLeaves = this.leaveService.getLeavesByEmployee(this.employee.employeeId);
         }
+        this.cdr.markForCheck();
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    this.routeSub?.unsubscribe();
   }
 
   onAvatarError(event: Event): void {

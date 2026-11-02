@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { InvoiceService } from '../../../core/services/invoice.service';
@@ -13,6 +13,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
 @Component({
   selector: 'app-invoice-list',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
     ReactiveFormsModule,
@@ -74,7 +75,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
             type="text"
             class="form-control"
             placeholder="Search by invoice #, customer name..."
-            [value]="searchQuery"
+            [value]="searchQuery()"
             (input)="onSearch($event)"
           />
         </div>
@@ -109,7 +110,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let inv of pagedInvoices">
+              <tr *ngFor="let inv of pagedInvoices(); trackBy: trackById">
                 <td><strong class="font-mono">{{ inv.invoiceNumber }}</strong></td>
                 <td>
                   <strong>{{ inv.customerName }}</strong>
@@ -152,17 +153,17 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
         </div>
 
         <app-empty-state
-          *ngIf="filteredInvoices.length === 0"
+          *ngIf="filteredInvoices().length === 0"
           icon="file-text"
           title="No invoices found"
           description="Invoices are created directly from confirmed sales orders."
         ></app-empty-state>
 
         <app-pagination
-          [totalItems]="filteredInvoices.length"
+          [totalItems]="filteredInvoices().length"
           [pageSize]="pageSize"
-          [currentPage]="currentPage"
-          (pageChanged)="currentPage = $event"
+          [currentPage]="currentPage()"
+          (pageChanged)="currentPage.set($event)"
         ></app-pagination>
       </div>
 
@@ -231,7 +232,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let item of selectedInvoice.items; let i = index">
+              <tr *ngFor="let item of selectedInvoice.items; trackBy: trackById; let i = index">
                 <td>{{ i + 1 }}</td>
                 <td><strong>{{ item.description }}</strong></td>
                 <td class="text-center">{{ item.quantity }}</td>
@@ -297,7 +298,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
                   </tr>
                 </thead>
                 <tbody>
-                  <tr *ngFor="let p of selectedInvoice.payments">
+                  <tr *ngFor="let p of selectedInvoice.payments; trackBy: trackById">
                     <td><strong class="font-mono">{{ p.paymentId }}</strong></td>
                     <td>{{ p.paymentDate }}</td>
                     <td>{{ p.paymentMethod }}</td>
@@ -593,10 +594,10 @@ export class InvoiceListComponent {
 
   Math = Math;
 
-  searchQuery = '';
-  selectedStatus = 'All';
+  searchQuery = signal('');
+  selectedStatus = signal('All');
 
-  currentPage = 1;
+  currentPage = signal(1);
   pageSize = 8;
 
   showViewModal = false;
@@ -612,6 +613,34 @@ export class InvoiceListComponent {
     return this.auth.hasRole(['Admin', 'Finance Manager']);
   }
 
+  filteredInvoices = computed(() => {
+    let list = this.invoiceService.invoices();
+    const query = this.searchQuery().trim().toLowerCase();
+    const status = this.selectedStatus();
+
+    if (query) {
+      list = list.filter(i =>
+        i.invoiceNumber.toLowerCase().includes(query) ||
+        i.customerName.toLowerCase().includes(query) ||
+        i.salesOrderNumber.toLowerCase().includes(query)
+      );
+    }
+
+    if (status !== 'All') {
+      list = list.filter(i => i.paymentStatus === status);
+    }
+    return list;
+  });
+
+  pagedInvoices = computed(() => {
+    const start = (this.currentPage() - 1) * this.pageSize;
+    return this.filteredInvoices().slice(start, start + this.pageSize);
+  });
+
+  trackById(index: number, item: any): string {
+    return item?.id || item?.invoiceNumber || item?.paymentId || index.toString();
+  }
+
   constructor() {
     this.paymentForm = this.fb.group({
       amount: [0, [Validators.required, Validators.min(1)]],
@@ -621,37 +650,14 @@ export class InvoiceListComponent {
     });
   }
 
-  get filteredInvoices(): Invoice[] {
-    let list = this.invoiceService.invoices();
-
-    if (this.searchQuery.trim()) {
-      const q = this.searchQuery.toLowerCase().trim();
-      list = list.filter(i =>
-        i.invoiceNumber.toLowerCase().includes(q) ||
-        i.customerName.toLowerCase().includes(q) ||
-        i.salesOrderNumber.toLowerCase().includes(q)
-      );
-    }
-
-    if (this.selectedStatus !== 'All') {
-      list = list.filter(i => i.paymentStatus === this.selectedStatus);
-    }
-    return list;
-  }
-
-  get pagedInvoices(): Invoice[] {
-    const start = (this.currentPage - 1) * this.pageSize;
-    return this.filteredInvoices.slice(start, start + this.pageSize);
-  }
-
   onSearch(event: Event): void {
-    this.searchQuery = (event.target as HTMLInputElement).value;
-    this.currentPage = 1;
+    this.searchQuery.set((event.target as HTMLInputElement).value);
+    this.currentPage.set(1);
   }
 
   onStatusFilter(event: Event): void {
-    this.selectedStatus = (event.target as HTMLSelectElement).value;
-    this.currentPage = 1;
+    this.selectedStatus.set((event.target as HTMLSelectElement).value);
+    this.currentPage.set(1);
   }
 
   viewInvoice(inv: Invoice): void {

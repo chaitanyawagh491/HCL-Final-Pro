@@ -1,6 +1,7 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, ChangeDetectionStrategy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { LeaveService } from '../../../core/services/leave.service';
 import { EmployeeService } from '../../../core/services/employee.service';
@@ -14,6 +15,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
 @Component({
   selector: 'app-leave-management',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, FormsModule, ReactiveFormsModule, IconComponent, BadgeComponent, ModalComponent, EmptyStateComponent],
   template: `
     <div class="leave-page">
@@ -30,30 +32,30 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
       </div>
 
       <!-- User's own Leave Balances Card (Especially helpful for logged in employee) -->
-      <div class="erp-card balance-summary-card" *ngIf="currentEmployee">
+      <div class="erp-card balance-summary-card" *ngIf="currentEmployee()">
         <div class="user-greeting">
-          <img [src]="currentEmployee.avatar" alt="Avatar" class="avatar-sm" />
+          <img [src]="currentEmployee()!.avatar" alt="Avatar" class="avatar-sm" />
           <div>
-            <strong>{{ currentEmployee.fullName }}</strong> ({{ currentEmployee.designation }})
-            <span class="text-muted d-block">{{ currentEmployee.departmentName }}</span>
+            <strong>{{ currentEmployee()!.fullName }}</strong> ({{ currentEmployee()!.designation }})
+            <span class="text-muted d-block">{{ currentEmployee()!.departmentName }}</span>
           </div>
         </div>
         <div class="quotas-row">
           <div class="quota-pill">
             <span class="q-label">Casual Leave</span>
-            <span class="q-val">{{ currentEmployee.casualLeaveBalance }} <small>days</small></span>
+            <span class="q-val">{{ currentEmployee()!.casualLeaveBalance }} <small>days</small></span>
           </div>
           <div class="quota-pill">
             <span class="q-label">Sick Leave</span>
-            <span class="q-val">{{ currentEmployee.sickLeaveBalance }} <small>days</small></span>
+            <span class="q-val">{{ currentEmployee()!.sickLeaveBalance }} <small>days</small></span>
           </div>
           <div class="quota-pill">
             <span class="q-label">Earned Leave</span>
-            <span class="q-val">{{ currentEmployee.earnedLeaveBalance }} <small>days</small></span>
+            <span class="q-val">{{ currentEmployee()!.earnedLeaveBalance }} <small>days</small></span>
           </div>
           <div class="quota-pill">
             <span class="q-label">Unpaid Taken</span>
-            <span class="q-val">{{ currentEmployee.unpaidLeaveTaken }} <small>days</small></span>
+            <span class="q-val">{{ currentEmployee()!.unpaidLeaveTaken }} <small>days</small></span>
           </div>
         </div>
       </div>
@@ -63,32 +65,32 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
         <button
           type="button"
           class="tab-btn"
-          [class.active]="activeTab === 'Pending'"
-          (click)="activeTab = 'Pending'"
+          [class.active]="activeTab() === 'Pending'"
+          (click)="activeTab.set('Pending')"
         >
           Pending Requests ({{ leaveService.pendingLeavesCount() }})
         </button>
         <button
           type="button"
           class="tab-btn"
-          [class.active]="activeTab === 'Approved'"
-          (click)="activeTab = 'Approved'"
+          [class.active]="activeTab() === 'Approved'"
+          (click)="activeTab.set('Approved')"
         >
           Approved History ({{ leaveService.approvedLeavesCount() }})
         </button>
         <button
           type="button"
           class="tab-btn"
-          [class.active]="activeTab === 'Rejected'"
-          (click)="activeTab = 'Rejected'"
+          [class.active]="activeTab() === 'Rejected'"
+          (click)="activeTab.set('Rejected')"
         >
           Rejected ({{ leaveService.rejectedLeavesCount() }})
         </button>
         <button
           type="button"
           class="tab-btn"
-          [class.active]="activeTab === 'All'"
-          (click)="activeTab = 'All'"
+          [class.active]="activeTab() === 'All'"
+          (click)="activeTab.set('All')"
         >
           All Requests ({{ leaveService.leaveRequests().length }})
         </button>
@@ -123,7 +125,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let leave of filteredLeaves">
+              <tr *ngFor="let leave of filteredLeaves(); trackBy: trackById">
                 <td><span class="id-tag">{{ leave.requestId }}</span></td>
                 <td><strong>{{ leave.employeeName }}</strong></td>
                 <td>{{ leave.departmentName }}</td>
@@ -156,7 +158,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
         </div>
 
         <app-empty-state
-          *ngIf="filteredLeaves.length === 0"
+          *ngIf="filteredLeaves().length === 0"
           icon="calendar"
           title="No leave requests in this view"
           description="There are currently no leave applications matching the selected status tab."
@@ -404,25 +406,15 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
     }
   `]
 })
-export class LeaveManagementComponent implements OnInit {
+export class LeaveManagementComponent implements OnInit, OnDestroy {
   leaveService = inject(LeaveService);
   employeeService = inject(EmployeeService);
   auth = inject(AuthService);
   private fb = inject(FormBuilder);
   private route = inject(ActivatedRoute);
+  private querySub?: Subscription;
 
-  ngOnInit(): void {
-    this.route.queryParams.subscribe(params => {
-      if (params['tab']) {
-        this.activeTab = params['tab'] as any;
-      }
-      if (params['action'] === 'apply') {
-        setTimeout(() => this.openApplyModal(), 100);
-      }
-    });
-  }
-
-  activeTab: 'Pending' | 'Approved' | 'Rejected' | 'All' = 'Pending';
+  activeTab = signal<'Pending' | 'Approved' | 'Rejected' | 'All'>('Pending');
   showApplyModal = false;
   showReviewModal = false;
   reviewAction: 'approve' | 'reject' = 'approve';
@@ -443,18 +435,18 @@ export class LeaveManagementComponent implements OnInit {
     return this.auth.hasRole(['Admin', 'HR Manager']);
   }
 
-  get currentEmployee() {
+  currentEmployee = computed(() => {
     const user = this.auth.currentUser();
     if (!user) return undefined;
     return this.employeeService.employees().find(e => e.employeeId === user.employeeId || e.email === user.email);
-  }
+  });
 
   get selectedEmpQuota() {
     const empId = this.applyForm.get('employeeId')?.value;
     return this.employeeService.getEmployeeById(empId);
   }
 
-  get filteredLeaves(): LeaveRequest[] {
+  filteredLeaves = computed(() => {
     let list = this.leaveService.leaveRequests();
 
     // If logged in as regular employee, filter to show only their own requests
@@ -463,14 +455,34 @@ export class LeaveManagementComponent implements OnInit {
       list = list.filter(l => l.employeeId === user.employeeId);
     }
 
-    if (this.activeTab !== 'All') {
-      list = list.filter(l => l.status === this.activeTab);
+    const tab = this.activeTab();
+    if (tab !== 'All') {
+      list = list.filter(l => l.status === tab);
     }
     return list;
+  });
+
+  trackById(index: number, leave: any): string {
+    return leave?.id || leave?.requestId || index.toString();
+  }
+
+  ngOnInit(): void {
+    this.querySub = this.route.queryParams.subscribe(params => {
+      if (params['tab']) {
+        this.activeTab.set(params['tab'] as any);
+      }
+      if (params['action'] === 'apply') {
+        setTimeout(() => this.openApplyModal(), 100);
+      }
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.querySub?.unsubscribe();
   }
 
   constructor() {
-    const defaultEmp = this.currentEmployee || this.employeeService.employees()[0];
+    const defaultEmp = this.currentEmployee() || this.employeeService.employees()[0];
     const today = new Date().toISOString().split('T')[0];
 
     this.applyForm = this.fb.group({
@@ -502,7 +514,7 @@ export class LeaveManagementComponent implements OnInit {
     this.errorMessage = '';
     this.successMessage = '';
     const today = new Date().toISOString().split('T')[0];
-    const defaultEmp = this.currentEmployee || this.employeeService.employees()[0];
+    const defaultEmp = this.currentEmployee() || this.employeeService.employees()[0];
 
     this.applyForm.patchValue({
       employeeId: defaultEmp?.employeeId || 'EMP-1001',

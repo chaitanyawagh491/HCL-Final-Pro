@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { SupplierService } from '../../../core/services/supplier.service';
@@ -15,6 +15,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
   selector: 'app-supplier-list',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, IconComponent, BadgeComponent, ModalComponent, ConfirmDialogComponent, EmptyStateComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="suppliers-page">
       <!-- Page Header -->
@@ -37,7 +38,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
             type="text"
             class="form-control"
             placeholder="Search suppliers by name, company, GST, email..."
-            [value]="searchQuery"
+            [value]="searchQuery()"
             (input)="onSearch($event)"
           />
         </div>
@@ -53,7 +54,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
 
       <!-- Suppliers Grid -->
       <div class="grid-cols-2">
-        <div class="erp-card supplier-card" *ngFor="let sup of filteredSuppliers">
+        <div class="erp-card supplier-card" *ngFor="let sup of filteredSuppliers(); trackBy: trackById">
           <div class="sup-card-header">
             <div>
               <span class="sup-id-badge">{{ sup.supplierId }}</span>
@@ -109,7 +110,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
       </div>
 
       <app-empty-state
-        *ngIf="filteredSuppliers.length === 0"
+        *ngIf="filteredSuppliers().length === 0"
         icon="truck"
         title="No suppliers found"
         description="No vendor accounts match your filter criteria."
@@ -365,8 +366,8 @@ export class SupplierListComponent {
   auth = inject(AuthService);
   private fb = inject(FormBuilder);
 
-  searchQuery = '';
-  selectedStatus = 'All';
+  searchQuery = signal('');
+  selectedStatus = signal('All');
 
   showModal = false;
   editingSupplierId: string | null = null;
@@ -396,11 +397,12 @@ export class SupplierListComponent {
     });
   }
 
-  get filteredSuppliers(): Supplier[] {
+  filteredSuppliers = computed(() => {
     let list = this.supplierService.suppliers();
+    const q = this.searchQuery().toLowerCase().trim();
+    const status = this.selectedStatus();
 
-    if (this.searchQuery.trim()) {
-      const q = this.searchQuery.toLowerCase().trim();
+    if (q) {
       list = list.filter(s =>
         s.supplierName.toLowerCase().includes(q) ||
         s.companyName.toLowerCase().includes(q) ||
@@ -410,18 +412,22 @@ export class SupplierListComponent {
       );
     }
 
-    if (this.selectedStatus !== 'All') {
-      list = list.filter(s => s.status === this.selectedStatus);
+    if (status !== 'All') {
+      list = list.filter(s => s.status === status);
     }
     return list;
+  });
+
+  trackById(index: number, sup: Supplier): string {
+    return sup.id || sup.supplierId;
   }
 
   onSearch(event: Event): void {
-    this.searchQuery = (event.target as HTMLInputElement).value;
+    this.searchQuery.set((event.target as HTMLInputElement).value);
   }
 
   onStatusFilter(event: Event): void {
-    this.selectedStatus = (event.target as HTMLSelectElement).value;
+    this.selectedStatus.set((event.target as HTMLSelectElement).value);
   }
 
   openAddModal(): void {

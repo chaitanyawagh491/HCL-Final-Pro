@@ -1,4 +1,4 @@
-import { Component, Output, EventEmitter, inject, signal } from '@angular/core';
+import { Component, Output, EventEmitter, inject, signal, computed, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
@@ -22,6 +22,7 @@ import { DEFAULT_AVATAR, CW_AVATAR } from '../../core/constants/avatars';
   selector: 'app-header',
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent, ConfirmDialogComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="app-header">
       <div class="header-left">
@@ -74,7 +75,7 @@ import { DEFAULT_AVATAR, CW_AVATAR } from '../../core/constants/avatars';
             <div class="notif-list">
               <div
                 class="notif-item"
-                *ngFor="let item of notificationService.notifications().slice(0, 8)"
+                *ngFor="let item of recentNotifications(); trackBy: trackById"
                 [class.unread]="!item.read"
                 (click)="onNotificationClick(item)"
               >
@@ -429,6 +430,12 @@ export class HeaderComponent {
   showResetModal = false;
   isDark = signal(false);
   defaultAvatar = DEFAULT_AVATAR;
+
+  recentNotifications = computed(() => this.notificationService.notifications().slice(0, 8));
+
+  trackById(index: number, item: any): string {
+    return item.id || index;
+  }
 
   onAvatarError(event: Event): void {
     const target = event.target as HTMLImageElement;

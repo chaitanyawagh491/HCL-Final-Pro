@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { SidebarComponent } from '../sidebar/sidebar.component';
@@ -7,6 +7,7 @@ import { HeaderComponent } from '../header/header.component';
 @Component({
   selector: 'app-main-layout',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, RouterModule, SidebarComponent, HeaderComponent],
   template: `
     <div class="layout-root" [class.sidebar-collapsed]="isSidebarCollapsed">

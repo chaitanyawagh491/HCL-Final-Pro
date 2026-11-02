@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -27,6 +27,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
     PaginationComponent,
     EmptyStateComponent
   ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="inventory-page">
       <!-- Page Header -->
@@ -75,7 +76,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
             type="text"
             class="form-control"
             placeholder="Search products by SKU, name, warehouse..."
-            [value]="searchQuery"
+            [value]="searchQuery()"
             (input)="onSearch($event)"
           />
         </div>
@@ -124,7 +125,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let prod of pagedProducts">
+              <tr *ngFor="let prod of pagedProducts(); trackBy: trackById">
                 <td>
                   <span class="sku-pill">{{ prod.sku }}</span>
                   <div class="id-sub">{{ prod.productId }}</div>
@@ -160,7 +161,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
         </div>
 
         <app-empty-state
-          *ngIf="filteredProducts.length === 0"
+          *ngIf="filteredProducts().length === 0"
           icon="box"
           title="No products match criteria"
           description="Try clearing your search query or adjusting your category/status filters."
@@ -170,10 +171,10 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
         ></app-empty-state>
 
         <app-pagination
-          [totalItems]="filteredProducts.length"
+          [totalItems]="filteredProducts().length"
           [pageSize]="pageSize"
-          [currentPage]="currentPage"
-          (pageChanged)="currentPage = $event"
+          [currentPage]="currentPage()"
+          (pageChanged)="currentPage.set($event)"
         ></app-pagination>
       </div>
 
@@ -404,12 +405,12 @@ export class ProductListComponent {
     'Packaging'
   ];
 
-  searchQuery = '';
-  selectedCategory = 'All';
-  selectedStatus = 'All';
-  selectedWarehouse = 'All';
+  searchQuery = signal('');
+  selectedCategory = signal('All');
+  selectedStatus = signal('All');
+  selectedWarehouse = signal('All');
 
-  currentPage = 1;
+  currentPage = signal(1);
   pageSize = 8;
 
   showModal = false;
@@ -439,11 +440,14 @@ export class ProductListComponent {
     });
   }
 
-  get filteredProducts(): Product[] {
+  filteredProducts = computed(() => {
     let list = this.inventoryService.products();
+    const q = this.searchQuery().toLowerCase().trim();
+    const cat = this.selectedCategory();
+    const status = this.selectedStatus();
+    const wh = this.selectedWarehouse();
 
-    if (this.searchQuery.trim()) {
-      const q = this.searchQuery.toLowerCase().trim();
+    if (q) {
       list = list.filter(p =>
         p.name.toLowerCase().includes(q) ||
         p.sku.toLowerCase().includes(q) ||
@@ -452,52 +456,56 @@ export class ProductListComponent {
       );
     }
 
-    if (this.selectedCategory !== 'All') {
-      list = list.filter(p => p.category === this.selectedCategory);
+    if (cat !== 'All') {
+      list = list.filter(p => p.category === cat);
     }
 
-    if (this.selectedStatus !== 'All') {
-      list = list.filter(p => p.status === this.selectedStatus);
+    if (status !== 'All') {
+      list = list.filter(p => p.status === status);
     }
 
-    if (this.selectedWarehouse !== 'All') {
-      list = list.filter(p => p.warehouse === this.selectedWarehouse);
+    if (wh !== 'All') {
+      list = list.filter(p => p.warehouse === wh);
     }
 
     return list;
-  }
+  });
 
-  get pagedProducts(): Product[] {
-    const start = (this.currentPage - 1) * this.pageSize;
-    return this.filteredProducts.slice(start, start + this.pageSize);
+  pagedProducts = computed(() => {
+    const start = (this.currentPage() - 1) * this.pageSize;
+    return this.filteredProducts().slice(start, start + this.pageSize);
+  });
+
+  trackById(index: number, prod: Product): string {
+    return prod.id || prod.productId;
   }
 
   onSearch(event: Event): void {
-    this.searchQuery = (event.target as HTMLInputElement).value;
-    this.currentPage = 1;
+    this.searchQuery.set((event.target as HTMLInputElement).value);
+    this.currentPage.set(1);
   }
 
   onCategoryFilter(event: Event): void {
-    this.selectedCategory = (event.target as HTMLSelectElement).value;
-    this.currentPage = 1;
+    this.selectedCategory.set((event.target as HTMLSelectElement).value);
+    this.currentPage.set(1);
   }
 
   onStatusFilter(event: Event): void {
-    this.selectedStatus = (event.target as HTMLSelectElement).value;
-    this.currentPage = 1;
+    this.selectedStatus.set((event.target as HTMLSelectElement).value);
+    this.currentPage.set(1);
   }
 
   onWarehouseFilter(event: Event): void {
-    this.selectedWarehouse = (event.target as HTMLSelectElement).value;
-    this.currentPage = 1;
+    this.selectedWarehouse.set((event.target as HTMLSelectElement).value);
+    this.currentPage.set(1);
   }
 
   clearFilters(): void {
-    this.searchQuery = '';
-    this.selectedCategory = 'All';
-    this.selectedStatus = 'All';
-    this.selectedWarehouse = 'All';
-    this.currentPage = 1;
+    this.searchQuery.set('');
+    this.selectedCategory.set('All');
+    this.selectedStatus.set('All');
+    this.selectedWarehouse.set('All');
+    this.currentPage.set(1);
   }
 
   openAddModal(): void {

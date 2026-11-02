@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ExpenseService } from '../../../core/services/expense.service';
@@ -14,6 +14,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
 @Component({
   selector: 'app-expense-list',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
     ReactiveFormsModule,
@@ -64,7 +65,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
             type="text"
             class="form-control"
             placeholder="Search by title, voucher ID, description..."
-            [value]="searchQuery"
+            [value]="searchQuery()"
             (input)="onSearch($event)"
           />
         </div>
@@ -72,7 +73,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
         <div class="filter-bar">
           <select class="form-select" (change)="onCategoryFilter($event)">
             <option value="All">All Categories</option>
-            <option *ngFor="let cat of categories" [value]="cat">{{ cat }}</option>
+            <option *ngFor="let cat of categories; trackBy: trackByFn" [value]="cat">{{ cat }}</option>
           </select>
 
           <select class="form-select" (change)="onStatusFilter($event)">
@@ -100,7 +101,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let exp of pagedExpenses">
+              <tr *ngFor="let exp of pagedExpenses(); trackBy: trackById">
                 <td><strong class="font-mono">{{ exp.expenseId }}</strong></td>
                 <td>
                   <strong>{{ exp.title }}</strong>
@@ -127,7 +128,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
         </div>
 
         <app-empty-state
-          *ngIf="filteredExpenses.length === 0"
+          *ngIf="filteredExpenses().length === 0"
           icon="credit-card"
           title="No expense records found"
           description="Adjust your search query or category filters."
@@ -136,10 +137,10 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
         ></app-empty-state>
 
         <app-pagination
-          [totalItems]="filteredExpenses.length"
+          [totalItems]="filteredExpenses().length"
           [pageSize]="pageSize"
-          [currentPage]="currentPage"
-          (pageChanged)="currentPage = $event"
+          [currentPage]="currentPage()"
+          (pageChanged)="currentPage.set($event)"
         ></app-pagination>
       </div>
 
@@ -308,11 +309,11 @@ export class ExpenseListComponent {
     'Maintenance'
   ];
 
-  searchQuery = '';
-  selectedCategory = 'All';
-  selectedStatus = 'All';
+  searchQuery = signal('');
+  selectedCategory = signal('All');
+  selectedStatus = signal('All');
 
-  currentPage = 1;
+  currentPage = signal(1);
   pageSize = 8;
 
   showModal = false;
@@ -324,6 +325,43 @@ export class ExpenseListComponent {
 
   get canManage(): boolean {
     return this.auth.hasRole(['Admin', 'Finance Manager']);
+  }
+
+  filteredExpenses = computed(() => {
+    let list = this.expenseService.expenses();
+    const q = this.searchQuery().trim().toLowerCase();
+    const cat = this.selectedCategory();
+    const status = this.selectedStatus();
+
+    if (q) {
+      list = list.filter(e =>
+        e.title.toLowerCase().includes(q) ||
+        e.expenseId.toLowerCase().includes(q) ||
+        e.description.toLowerCase().includes(q)
+      );
+    }
+
+    if (cat !== 'All') {
+      list = list.filter(e => e.category === cat);
+    }
+
+    if (status !== 'All') {
+      list = list.filter(e => e.status === status);
+    }
+    return list;
+  });
+
+  pagedExpenses = computed(() => {
+    const start = (this.currentPage() - 1) * this.pageSize;
+    return this.filteredExpenses().slice(start, start + this.pageSize);
+  });
+
+  trackById(index: number, exp: any): string {
+    return exp?.id || exp?.expenseId || index.toString();
+  }
+
+  trackByFn(index: number, item: any): any {
+    return item || index;
   }
 
   constructor() {
@@ -339,46 +377,19 @@ export class ExpenseListComponent {
     });
   }
 
-  get filteredExpenses(): Expense[] {
-    let list = this.expenseService.expenses();
-
-    if (this.searchQuery.trim()) {
-      const q = this.searchQuery.toLowerCase().trim();
-      list = list.filter(e =>
-        e.title.toLowerCase().includes(q) ||
-        e.expenseId.toLowerCase().includes(q) ||
-        e.description.toLowerCase().includes(q)
-      );
-    }
-
-    if (this.selectedCategory !== 'All') {
-      list = list.filter(e => e.category === this.selectedCategory);
-    }
-
-    if (this.selectedStatus !== 'All') {
-      list = list.filter(e => e.status === this.selectedStatus);
-    }
-    return list;
-  }
-
-  get pagedExpenses(): Expense[] {
-    const start = (this.currentPage - 1) * this.pageSize;
-    return this.filteredExpenses.slice(start, start + this.pageSize);
-  }
-
   onSearch(event: Event): void {
-    this.searchQuery = (event.target as HTMLInputElement).value;
-    this.currentPage = 1;
+    this.searchQuery.set((event.target as HTMLInputElement).value);
+    this.currentPage.set(1);
   }
 
   onCategoryFilter(event: Event): void {
-    this.selectedCategory = (event.target as HTMLSelectElement).value;
-    this.currentPage = 1;
+    this.selectedCategory.set((event.target as HTMLSelectElement).value);
+    this.currentPage.set(1);
   }
 
   onStatusFilter(event: Event): void {
-    this.selectedStatus = (event.target as HTMLSelectElement).value;
-    this.currentPage = 1;
+    this.selectedStatus.set((event.target as HTMLSelectElement).value);
+    this.currentPage.set(1);
   }
 
   openAddModal(): void {

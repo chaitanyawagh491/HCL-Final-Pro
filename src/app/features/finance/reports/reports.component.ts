@@ -1,7 +1,8 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { ReportService } from '../../../core/services/report.service';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
 import { BadgeComponent } from '../../../shared/components/badge/badge.component';
@@ -19,6 +20,7 @@ type ReportType =
 @Component({
   selector: 'app-reports',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, FormsModule, IconComponent, BadgeComponent],
   template: `
     <div class="reports-page">
@@ -45,7 +47,7 @@ type ReportType =
         <button
           type="button"
           class="report-tab-btn"
-          *ngFor="let rep of reportTabs"
+          *ngFor="let rep of reportTabs; trackBy: trackByTab"
           [class.active]="selectedReport === rep.id"
           (click)="selectReport(rep.id)"
         >
@@ -117,7 +119,7 @@ type ReportType =
 
         <!-- Summary KPI Metrics for the Report -->
         <div class="report-summary-grid" *ngIf="activeReportData?.summary">
-          <div class="rep-sum-card" *ngFor="let item of getSummaryEntries(activeReportData.summary)">
+          <div class="rep-sum-card" *ngFor="let item of summaryEntries; trackBy: trackByFirst">
             <span class="sum-key">{{ formatKey(item[0]) }}</span>
             <span class="sum-val">{{ formatVal(item[1]) }}</span>
           </div>
@@ -134,7 +136,7 @@ type ReportType =
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let line of activeReportData?.breakdown">
+              <tr *ngFor="let line of activeReportData?.breakdown; trackBy: trackByItem">
                 <td><strong>{{ line.item }}</strong></td>
                 <td>
                   <app-badge [text]="line.type" [variant]="line.type === 'Credit' ? 'success' : (line.type === 'Debit' ? 'danger' : 'neutral')"></app-badge>
@@ -162,14 +164,14 @@ type ReportType =
           <table class="erp-table">
             <thead>
               <tr>
-                <th *ngFor="let col of getTableColumns(activeReportData.rows)">
+                <th *ngFor="let col of tableColumns; trackBy: trackByCol">
                   {{ formatKey(col) }}
                 </th>
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let row of activeReportData.rows">
-                <td *ngFor="let col of getTableColumns(activeReportData.rows)">
+              <tr *ngFor="let row of activeReportData.rows; trackBy: trackByRow">
+                <td *ngFor="let col of tableColumns; trackBy: trackByCol">
                   <span *ngIf="isStatusField(col)">
                     <app-badge [text]="row[col]"></app-badge>
                   </span>
@@ -320,9 +322,11 @@ type ReportType =
     }
   `]
 })
-export class ReportsComponent implements OnInit {
+export class ReportsComponent implements OnInit, OnDestroy {
   reportService = inject(ReportService);
   private route = inject(ActivatedRoute);
+  private cdr = inject(ChangeDetectorRef);
+  private querySub?: Subscription;
 
   reportTabs: Array<{ id: ReportType; label: string; icon: string }> = [
     { id: 'sales', label: '1. Sales Orders Report', icon: 'shopping-cart' },
@@ -342,14 +346,40 @@ export class ReportsComponent implements OnInit {
   deptFilter = 'All';
 
   activeReportData: any = null;
+  tableColumns: string[] = [];
+  summaryEntries: [string, any][] = [];
+
+  trackByTab(index: number, tab: any): string {
+    return tab.id;
+  }
+
+  trackByRow(index: number, row: any): any {
+    return row?.id || row?.orderNumber || row?.invoiceNumber || row?.expenseId || row?.employeeId || index;
+  }
+
+  trackByCol(index: number, col: string): string {
+    return col;
+  }
+
+  trackByFirst(index: number, item: [string, any]): string {
+    return item[0];
+  }
+
+  trackByItem(index: number, line: any): string {
+    return line.item || index.toString();
+  }
 
   ngOnInit(): void {
-    this.route.queryParams.subscribe(params => {
+    this.querySub = this.route.queryParams.subscribe(params => {
       if (params['type']) {
         this.selectedReport = params['type'] as ReportType;
         this.refreshData();
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    this.querySub?.unsubscribe();
   }
 
   constructor() {
@@ -393,6 +423,10 @@ export class ReportsComponent implements OnInit {
         this.activeReportData = this.reportService.getEmployeeSalaryReport(this.deptFilter);
         break;
     }
+
+    this.summaryEntries = this.activeReportData?.summary ? Object.entries(this.activeReportData.summary) : [];
+    this.tableColumns = this.activeReportData?.rows && this.activeReportData.rows.length > 0 ? Object.keys(this.activeReportData.rows[0]) : [];
+    this.cdr.markForCheck();
   }
 
   resetFilters(): void {

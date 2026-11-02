@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnChanges } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnChanges, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IconComponent } from '../icon/icon.component';
 
@@ -6,6 +6,7 @@ import { IconComponent } from '../icon/icon.component';
   selector: 'app-pagination',
   standalone: true,
   imports: [CommonModule, IconComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="pagination-container" *ngIf="totalItems > 0">
       <div class="pagination-info">

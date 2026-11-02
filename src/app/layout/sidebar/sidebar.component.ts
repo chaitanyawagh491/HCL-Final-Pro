@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, inject } from '@angular/core';
+import { Component, Input, Output, EventEmitter, inject, computed, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
@@ -24,6 +24,7 @@ interface NavSection {
   selector: 'app-sidebar',
   standalone: true,
   imports: [CommonModule, RouterModule, IconComponent, BadgeComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <aside class="app-sidebar" [class.collapsed]="isCollapsed">
       <!-- Brand Logo / Title -->
@@ -39,10 +40,10 @@ interface NavSection {
 
       <!-- Navigation Menu -->
       <div class="sidebar-nav">
-        <div class="nav-section" *ngFor="let section of filteredSections">
+        <div class="nav-section" *ngFor="let section of filteredSections(); trackBy: trackBySection">
           <div class="section-title" *ngIf="!isCollapsed && section.title">{{ section.title }}</div>
           <ul class="nav-list">
-            <li class="nav-item" *ngFor="let item of section.items">
+            <li class="nav-item" *ngFor="let item of section.items; trackBy: trackByItem">
               <a
                 [routerLink]="item.route"
                 [queryParams]="item.queryParams || null"
@@ -308,7 +309,7 @@ export class SidebarComponent {
     }
   ];
 
-  get filteredSections(): NavSection[] {
+  filteredSections = computed<NavSection[]>(() => {
     const role = this.auth.currentRole();
     if (!role) return [];
 
@@ -320,6 +321,14 @@ export class SidebarComponent {
         return item.roles.includes(role);
       })
     })).filter(sec => sec.items.length > 0);
+  });
+
+  trackBySection(index: number, sec: NavSection): string {
+    return sec.title;
+  }
+
+  trackByItem(index: number, item: NavItem): string {
+    return item.route;
   }
 }
 

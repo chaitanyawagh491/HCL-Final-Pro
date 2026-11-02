@@ -1,4 +1,4 @@
-import { Component, inject, computed } from '@angular/core';
+import { Component, inject, computed, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { EmployeeService } from '../../core/services/employee.service';
@@ -21,6 +21,7 @@ import { IconComponent } from '../../shared/components/icon/icon.component';
   selector: 'app-dashboard',
   standalone: true,
   imports: [CommonModule, RouterModule, StatCardComponent, BadgeComponent, ChartComponent, IconComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="dashboard-page">
       <!-- Welcome Banner -->
@@ -209,8 +210,8 @@ import { IconComponent } from '../../shared/components/icon/icon.component';
             </div>
             <app-chart
               type="bar"
-              [labels]="monthlySalesData.labels"
-              [datasets]="monthlySalesData.datasets"
+              [labels]="monthlySalesData().labels"
+              [datasets]="monthlySalesData().datasets"
               [height]="250"
             ></app-chart>
           </div>
@@ -226,8 +227,8 @@ import { IconComponent } from '../../shared/components/icon/icon.component';
             </div>
             <app-chart
               type="line"
-              [labels]="revExpChartData.labels"
-              [datasets]="revExpChartData.datasets"
+              [labels]="revExpChartData().labels"
+              [datasets]="revExpChartData().datasets"
               [height]="250"
             ></app-chart>
           </div>
@@ -244,8 +245,8 @@ import { IconComponent } from '../../shared/components/icon/icon.component';
             </div>
             <app-chart
               type="doughnut"
-              [labels]="categoryChartData.labels"
-              [datasets]="categoryChartData.datasets"
+              [labels]="categoryChartData().labels"
+              [datasets]="categoryChartData().datasets"
               [height]="220"
             ></app-chart>
           </div>
@@ -260,8 +261,8 @@ import { IconComponent } from '../../shared/components/icon/icon.component';
             </div>
             <app-chart
               type="doughnut"
-              [labels]="departmentChartData.labels"
-              [datasets]="departmentChartData.datasets"
+              [labels]="departmentChartData().labels"
+              [datasets]="departmentChartData().datasets"
               [height]="220"
             ></app-chart>
           </div>
@@ -276,8 +277,8 @@ import { IconComponent } from '../../shared/components/icon/icon.component';
             </div>
             <app-chart
               type="pie"
-              [labels]="leaveStatusChartData.labels"
-              [datasets]="leaveStatusChartData.datasets"
+              [labels]="leaveStatusChartData().labels"
+              [datasets]="leaveStatusChartData().datasets"
               [height]="220"
             ></app-chart>
           </div>
@@ -292,8 +293,8 @@ import { IconComponent } from '../../shared/components/icon/icon.component';
             </div>
             <app-chart
               type="doughnut"
-              [labels]="poStatusChartData.labels"
-              [datasets]="poStatusChartData.datasets"
+              [labels]="poStatusChartData().labels"
+              [datasets]="poStatusChartData().datasets"
               [height]="220"
             ></app-chart>
           </div>
@@ -344,7 +345,7 @@ import { IconComponent } from '../../shared/components/icon/icon.component';
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let so of salesService.salesOrders().slice(0, 6)">
+              <tr *ngFor="let so of salesOrdersList(); trackBy: trackById">
                 <td><strong class="font-mono">{{ so.orderNumber }}</strong></td>
                 <td>{{ so.customerName }}</td>
                 <td>{{ so.orderDate }}</td>
@@ -371,7 +372,7 @@ import { IconComponent } from '../../shared/components/icon/icon.component';
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let po of procurementService.purchaseOrders().slice(0, 6)">
+              <tr *ngFor="let po of purchaseOrdersList(); trackBy: trackById">
                 <td><strong class="font-mono">{{ po.poNumber }}</strong></td>
                 <td>{{ po.supplierName }}</td>
                 <td>{{ po.orderDate }}</td>
@@ -398,7 +399,7 @@ import { IconComponent } from '../../shared/components/icon/icon.component';
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let inv of invoiceService.invoices().slice(0, 6)">
+              <tr *ngFor="let inv of invoicesList(); trackBy: trackById">
                 <td><strong class="font-mono">{{ inv.invoiceNumber }}</strong></td>
                 <td>{{ inv.customerName }}</td>
                 <td>{{ inv.invoiceDate }}</td>
@@ -426,7 +427,7 @@ import { IconComponent } from '../../shared/components/icon/icon.component';
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let sm of inventoryService.stockMovements().slice(0, 6)">
+              <tr *ngFor="let sm of stockMovementsList(); trackBy: trackById">
                 <td><span class="font-mono">{{ sm.movementId }}</span></td>
                 <td><strong>{{ sm.productName }}</strong> ({{ sm.sku }})</td>
                 <td>
@@ -458,7 +459,7 @@ import { IconComponent } from '../../shared/components/icon/icon.component';
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let exp of expenseService.expenses().slice(0, 6)">
+              <tr *ngFor="let exp of expensesList(); trackBy: trackById">
                 <td><span class="font-mono">{{ exp.expenseId }}</span></td>
                 <td>{{ exp.category }}</td>
                 <td>{{ exp.title }}</td>
@@ -486,7 +487,7 @@ import { IconComponent } from '../../shared/components/icon/icon.component';
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let lr of leaveService.leaveRequests().slice(0, 6)">
+              <tr *ngFor="let lr of leaveRequestsList(); trackBy: trackById">
                 <td><span class="font-mono">{{ lr.requestId }}</span></td>
                 <td><strong>{{ lr.employeeName }}</strong></td>
                 <td>{{ lr.departmentName }}</td>
@@ -643,12 +644,24 @@ export class DashboardComponent {
 
   activeActivityTab: 'sales' | 'procurement' | 'invoices' | 'movements' | 'financial' | 'hr' = 'sales';
 
+  // Memoized activity slices
+  salesOrdersList = computed(() => this.salesService.salesOrders().slice(0, 6));
+  purchaseOrdersList = computed(() => this.procurementService.purchaseOrders().slice(0, 6));
+  invoicesList = computed(() => this.invoiceService.invoices().slice(0, 6));
+  stockMovementsList = computed(() => this.inventoryService.stockMovements().slice(0, 6));
+  expensesList = computed(() => this.expenseService.expenses().slice(0, 6));
+  leaveRequestsList = computed(() => this.leaveService.leaveRequests().slice(0, 6));
+
   formatCurrency(val: number): string {
     return '₹' + Math.round(val).toLocaleString('en-IN');
   }
 
-  // 1. Monthly Sales Bar Chart
-  get monthlySalesData() {
+  trackById(index: number, item: any): string {
+    return item.id || item.orderNumber || item.poNumber || item.invoiceNumber || item.movementId || item.expenseId || item.requestId || index;
+  }
+
+  // 1. Monthly Sales Bar Chart (Memoized Signal)
+  monthlySalesData = computed(() => {
     return {
       labels: ['May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'],
       datasets: [
@@ -660,10 +673,10 @@ export class DashboardComponent {
         }
       ]
     };
-  }
+  });
 
-  // 2. Revenue vs Expenses Line Chart
-  get revExpChartData() {
+  // 2. Revenue vs Expenses Line Chart (Memoized Signal)
+  revExpChartData = computed(() => {
     const trends = this.financeService.getMonthlyFinancialTrends();
     return {
       labels: trends.labels,
@@ -686,10 +699,10 @@ export class DashboardComponent {
         }
       ]
     };
-  }
+  });
 
-  // 3. Inventory Category Doughnut Chart
-  get categoryChartData() {
+  // 3. Inventory Category Doughnut Chart (Memoized Signal)
+  categoryChartData = computed(() => {
     const counts: { [cat: string]: number } = {};
     this.inventoryService.products().forEach(p => {
       counts[p.category] = (counts[p.category] || 0) + 1;
@@ -703,10 +716,10 @@ export class DashboardComponent {
         }
       ]
     };
-  }
+  });
 
-  // 4. Employee Department Doughnut Chart
-  get departmentChartData() {
+  // 4. Employee Department Doughnut Chart (Memoized Signal)
+  departmentChartData = computed(() => {
     const counts: { [dept: string]: number } = {};
     this.employeeService.employees().forEach(e => {
       if (e.employmentStatus !== 'Terminated') {
@@ -722,10 +735,10 @@ export class DashboardComponent {
         }
       ]
     };
-  }
+  });
 
-  // 5. Leave Request Status Chart
-  get leaveStatusChartData() {
+  // 5. Leave Request Status Chart (Memoized Signal)
+  leaveStatusChartData = computed(() => {
     const pending = this.leaveService.pendingLeavesCount();
     const approved = this.leaveService.approvedLeavesCount();
     const rejected = this.leaveService.rejectedLeavesCount();
@@ -738,10 +751,10 @@ export class DashboardComponent {
         }
       ]
     };
-  }
+  });
 
-  // 6. Purchase Order Status Chart
-  get poStatusChartData() {
+  // 6. Purchase Order Status Chart (Memoized Signal)
+  poStatusChartData = computed(() => {
     const pos = this.procurementService.purchaseOrders();
     const counts: { [status: string]: number } = {};
     pos.forEach(p => {
@@ -756,6 +769,6 @@ export class DashboardComponent {
         }
       ]
     };
-  }
+  });
 }
 

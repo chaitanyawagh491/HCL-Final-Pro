@@ -6,7 +6,10 @@ import {
   OnDestroy,
   SimpleChanges,
   ViewChild,
-  AfterViewInit
+  AfterViewInit,
+  ChangeDetectionStrategy,
+  NgZone,
+  inject
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import Chart, { ChartConfiguration, ChartType } from 'chart.js/auto';
@@ -15,6 +18,7 @@ import Chart, { ChartConfiguration, ChartType } from 'chart.js/auto';
   selector: 'app-chart',
   standalone: true,
   imports: [CommonModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="chart-wrapper" [style.height.px]="height">
       <canvas #chartCanvas></canvas>
@@ -40,32 +44,78 @@ export class ChartComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Input() options: any = {};
   @Input() height = 260;
 
+  private ngZone = inject(NgZone);
   private chartInstance: Chart | null = null;
+  private isDestroyed = false;
 
   ngAfterViewInit(): void {
-    this.renderChart();
+    this.ngZone.runOutsideAngular(() => {
+      this.renderChart();
+    });
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (this.chartInstance && (changes['labels'] || changes['datasets'] || changes['type'])) {
-      this.chartInstance.destroy();
-      this.renderChart();
+    if (!this.chartInstance) return;
+
+    if (changes['type']) {
+      this.ngZone.runOutsideAngular(() => {
+        this.renderChart();
+      });
+      return;
+    }
+
+    const labelsChanged = changes['labels'] && !this.areArraysEqual(changes['labels'].previousValue, changes['labels'].currentValue);
+    const datasetsChanged = changes['datasets'] && !this.areDatasetsEqual(changes['datasets'].previousValue, changes['datasets'].currentValue);
+
+    if (labelsChanged || datasetsChanged) {
+      this.ngZone.runOutsideAngular(() => {
+        if (this.chartInstance && !this.isDestroyed) {
+          this.chartInstance.data.labels = [...this.labels];
+          this.chartInstance.data.datasets = this.datasets.map(d => ({ ...d }));
+          this.chartInstance.update('none'); // Update in-place without triggering heavy requestAnimationFrames
+        }
+      });
     }
   }
 
+  private areArraysEqual(a: any[] | undefined, b: any[] | undefined): boolean {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }
+
+  private areDatasetsEqual(a: any[] | undefined, b: any[] | undefined): boolean {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      const da = a[i]?.data;
+      const db = b[i]?.data;
+      if (!this.areArraysEqual(da, db)) return false;
+      if (a[i]?.label !== b[i]?.label) return false;
+    }
+    return true;
+  }
+
   private renderChart(): void {
-    if (!this.canvasRef?.nativeElement) return;
+    if (this.isDestroyed || !this.canvasRef?.nativeElement) return;
 
     const ctx = this.canvasRef.nativeElement.getContext('2d');
     if (!ctx) return;
 
     if (this.chartInstance) {
       this.chartInstance.destroy();
+      this.chartInstance = null;
     }
 
     const defaultOptions = {
       responsive: true,
       maintainAspectRatio: false,
+      animation: { duration: 300 },
       plugins: {
         legend: {
           display: this.type === 'doughnut' || this.type === 'pie' || this.datasets.length > 1,
@@ -102,8 +152,8 @@ export class ChartComponent implements AfterViewInit, OnChanges, OnDestroy {
     const config: ChartConfiguration = {
       type: this.type,
       data: {
-        labels: this.labels,
-        datasets: this.datasets
+        labels: [...this.labels],
+        datasets: this.datasets.map(d => ({ ...d }))
       },
       options: {
         ...defaultOptions,
@@ -115,10 +165,10 @@ export class ChartComponent implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.isDestroyed = true;
     if (this.chartInstance) {
       this.chartInstance.destroy();
       this.chartInstance = null;
     }
   }
 }
-

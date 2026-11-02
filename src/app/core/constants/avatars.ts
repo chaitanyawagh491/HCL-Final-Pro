@@ -22,3 +22,4 @@ export const MARCUS_AVATAR = createInitialsSvg('MC', '#0284C7', '#0369A1');
 export const VIKRAM_AVATAR = createInitialsSvg('VS', '#4F46E5', '#4338CA');
 
 export const DEFAULT_AVATAR = CW_AVATAR;
+

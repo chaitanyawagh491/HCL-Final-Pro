@@ -1,7 +1,8 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, ChangeDetectionStrategy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Subscription } from 'rxjs';
 import { EmployeeService } from '../../../core/services/employee.service';
 import { DepartmentService } from '../../../core/services/department.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -28,6 +29,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
     PaginationComponent,
     EmptyStateComponent
   ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="employee-page">
       <!-- Page Header -->
@@ -50,7 +52,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
             type="text"
             class="form-control"
             placeholder="Search by name, ID, email, designation..."
-            [value]="searchQuery"
+            [value]="searchQuery()"
             (input)="onSearch($event)"
           />
         </div>
@@ -103,7 +105,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let emp of pagedEmployees">
+              <tr *ngFor="let emp of pagedEmployees(); trackBy: trackById">
                 <td>
                   <div class="emp-profile-cell">
                     <img
@@ -151,7 +153,7 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
 
         <!-- Empty State -->
         <app-empty-state
-          *ngIf="filteredEmployees.length === 0"
+          *ngIf="filteredEmployees().length === 0"
           icon="users"
           title="No employees found"
           description="No employee records match the search criteria or selected filters."
@@ -162,10 +164,10 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
 
         <!-- Pagination -->
         <app-pagination
-          [totalItems]="filteredEmployees.length"
+          [totalItems]="filteredEmployees().length"
           [pageSize]="pageSize"
-          [currentPage]="currentPage"
-          (pageChanged)="currentPage = $event"
+          [currentPage]="currentPage()"
+          (pageChanged)="currentPage.set($event)"
         ></app-pagination>
       </div>
 
@@ -371,30 +373,22 @@ import { EmptyStateComponent } from '../../../shared/components/empty-state/empt
     }
   `]
 })
-export class EmployeeListComponent implements OnInit {
+export class EmployeeListComponent implements OnInit, OnDestroy {
   employeeService = inject(EmployeeService);
   deptService = inject(DepartmentService);
   auth = inject(AuthService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private fb = inject(FormBuilder);
-
-  ngOnInit(): void {
-    this.route.queryParams.subscribe(params => {
-      if ((params['action'] === 'register' || params['action'] === 'new') && this.canManage) {
-        setTimeout(() => this.openAddModal(), 100);
-      }
-    });
-  }
+  private querySub?: Subscription;
 
   defaultAvatar = DEFAULT_AVATAR;
 
-  searchQuery = '';
-  selectedDept = 'All';
-  selectedStatus = 'All';
-  selectedSort = 'name_asc';
-
-  currentPage = 1;
+  searchQuery = signal('');
+  selectedDept = signal('All');
+  selectedStatus = signal('All');
+  selectedSort = signal('name_asc');
+  currentPage = signal(1);
   pageSize = 8;
 
   showModal = false;
@@ -424,12 +418,26 @@ export class EmployeeListComponent implements OnInit {
     });
   }
 
-  get filteredEmployees(): Employee[] {
-    let list = this.employeeService.employees();
+  ngOnInit(): void {
+    this.querySub = this.route.queryParams.subscribe(params => {
+      if ((params['action'] === 'register' || params['action'] === 'new') && this.canManage) {
+        setTimeout(() => this.openAddModal(), 100);
+      }
+    });
+  }
 
-    // Search query
-    if (this.searchQuery.trim()) {
-      const q = this.searchQuery.toLowerCase().trim();
+  ngOnDestroy(): void {
+    this.querySub?.unsubscribe();
+  }
+
+  filteredEmployees = computed(() => {
+    let list = this.employeeService.employees();
+    const q = this.searchQuery().toLowerCase().trim();
+    const dept = this.selectedDept();
+    const status = this.selectedStatus();
+    const sort = this.selectedSort();
+
+    if (q) {
       list = list.filter(e =>
         e.fullName.toLowerCase().includes(q) ||
         e.employeeId.toLowerCase().includes(q) ||
@@ -438,19 +446,16 @@ export class EmployeeListComponent implements OnInit {
       );
     }
 
-    // Filter dept
-    if (this.selectedDept !== 'All') {
-      list = list.filter(e => e.departmentName === this.selectedDept);
+    if (dept !== 'All') {
+      list = list.filter(e => e.departmentName === dept);
     }
 
-    // Filter status
-    if (this.selectedStatus !== 'All') {
-      list = list.filter(e => e.employmentStatus === this.selectedStatus);
+    if (status !== 'All') {
+      list = list.filter(e => e.employmentStatus === status);
     }
 
-    // Sort
-    list = [...list].sort((a, b) => {
-      switch (this.selectedSort) {
+    return [...list].sort((a, b) => {
+      switch (sort) {
         case 'name_asc': return a.fullName.localeCompare(b.fullName);
         case 'name_desc': return b.fullName.localeCompare(a.fullName);
         case 'salary_desc': return b.salary - a.salary;
@@ -459,40 +464,42 @@ export class EmployeeListComponent implements OnInit {
         default: return 0;
       }
     });
+  });
 
-    return list;
-  }
+  pagedEmployees = computed(() => {
+    const start = (this.currentPage() - 1) * this.pageSize;
+    return this.filteredEmployees().slice(start, start + this.pageSize);
+  });
 
-  get pagedEmployees(): Employee[] {
-    const start = (this.currentPage - 1) * this.pageSize;
-    return this.filteredEmployees.slice(start, start + this.pageSize);
+  trackById(index: number, emp: Employee): string {
+    return emp.id || emp.employeeId;
   }
 
   onSearch(event: Event): void {
-    this.searchQuery = (event.target as HTMLInputElement).value;
-    this.currentPage = 1;
+    this.searchQuery.set((event.target as HTMLInputElement).value);
+    this.currentPage.set(1);
   }
 
   onDeptFilter(event: Event): void {
-    this.selectedDept = (event.target as HTMLSelectElement).value;
-    this.currentPage = 1;
+    this.selectedDept.set((event.target as HTMLSelectElement).value);
+    this.currentPage.set(1);
   }
 
   onStatusFilter(event: Event): void {
-    this.selectedStatus = (event.target as HTMLSelectElement).value;
-    this.currentPage = 1;
+    this.selectedStatus.set((event.target as HTMLSelectElement).value);
+    this.currentPage.set(1);
   }
 
   onSortChange(event: Event): void {
-    this.selectedSort = (event.target as HTMLSelectElement).value;
+    this.selectedSort.set((event.target as HTMLSelectElement).value);
   }
 
   clearFilters(): void {
-    this.searchQuery = '';
-    this.selectedDept = 'All';
-    this.selectedStatus = 'All';
-    this.selectedSort = 'name_asc';
-    this.currentPage = 1;
+    this.searchQuery.set('');
+    this.selectedDept.set('All');
+    this.selectedStatus.set('All');
+    this.selectedSort.set('name_asc');
+    this.currentPage.set(1);
   }
 
   viewDetails(empId: string): void {
